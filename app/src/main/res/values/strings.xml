@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GeoShift</string>
+    <string name="mock_enable_title">启用模拟位置</string>
+    <string name="mock_enable_desc">GeoShift 需要被选为"模拟位置应用"才能正常工作。</string>
+    <string name="mock_open_settings">打开开发者选项</string>
+    <string name="mock_status_active">模拟位置运行中</string>
+    <string name="mock_status_inactive">模拟位置未启动</string>
+    <string name="btn_start">开始模拟</string>
+    <string name="btn_stop">停止模拟</string>
+    <string name="btn_select_map">在地图上选择</string>
+    <string name="btn_paste">粘贴坐标</string>
+    <string name="hint_tap_map">点击地图选择位置</string>
+    <string name="latitude">纬度</string>
+    <string name="longitude">经度</string>
+    <string name="altitude">海拔</string>
+    <string name="accuracy">精度</string>
+    <string name="provider_name">geo_shift</string>
+    <string name="toast_started">模拟位置已启动</string>
+    <string name="toast_stopped">模拟位置已停止</string>
+    <string name="toast_copied">坐标已复制</string>
+    <string name="toast_permission_denied">权限被拒绝</string>
+    <string name="toast_invalid_coords">无效的坐标</string>
+</resources>
