@@ -7,26 +7,20 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 
 import androidx.core.app.NotificationCompat;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.Priority;
-
 public class MockLocationService extends Service {
 
     public static final String CHANNEL_ID = "geoshift_mock_channel";
     private static final int NOTIFICATION_ID = 1001;
 
-    private FusedLocationProviderClient fusedClient;
-    private LocationCallback mockCallback;
+    private LocationManager locationManager;
+    private android.location.LocationListener locationListener;
 
     public static void updateLocation(Service service, double lat, double lng) {
         if (service instanceof MockLocationService) {
@@ -38,7 +32,7 @@ public class MockLocationService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        fusedClient = LocationServices.getFusedLocationProviderClient(this);
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     }
 
     @Override
@@ -53,18 +47,10 @@ public class MockLocationService extends Service {
     }
 
     private void startMocking(double lat, double lng) {
-        LocationRequest request = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
-                .setWaitForAccurateLocation(false)
-                .setMinUpdateIntervalMillis(1000)
-                .setMaxUpdateDelayMillis(3000)
-                .build();
-
-        mockCallback = new LocationCallback() {
+        locationListener = new android.location.LocationListener(LocationManager.GPS_PROVIDER) {
             @Override
-            public void onLocationResult(LocationResult result) {
-                if (result == null || result.getLastLocation() == null) return;
-
-                Location mockLoc = new Location(result.getLastLocation());
+            public void onLocationChanged(Location realLocation) {
+                Location mockLoc = new Location(realLocation);
                 mockLoc.setLatitude(lat);
                 mockLoc.setLongitude(lng);
                 mockLoc.setAccuracy(5f);
@@ -72,19 +58,40 @@ public class MockLocationService extends Service {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     mockLoc.setElapsedRealtimeNanos(android.os.SystemClock.elapsedRealtimeNanos());
                 }
-                mockLoc.setProvider("geo_shift");
+                mockLoc.setProvider(LocationManager.GPS_PROVIDER);
 
-                fusedClient.setMockLocation(mockLoc)
-                        .addOnSuccessListener(aVoid -> {})
-                        .addOnFailureListener(e -> {});
+                locationManager.setTestProviderLocation(LocationManager.GPS_PROVIDER, mockLoc);
             }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Intent extras) {}
+
+            @Override
+            public void onProviderEnabled(String provider) {}
+
+            @Override
+            public void onProviderDisabled(String provider) {}
         };
 
-        fusedClient.requestLocationUpdates(request, mockCallback, Looper.getMainLooper());
+        try {
+            locationManager.addTestProvider(
+                LocationManager.GPS_PROVIDER,
+                false, false, false, false, true, true, true, 0, 0
+            );
+            locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true);
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                1000, 0f,
+                locationListener,
+                Looper.getMainLooper()
+            );
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
     }
 
     public void pushMockLocation(double lat, double lng) {
-        Location mockLoc = new Location("geo_shift");
+        Location mockLoc = new Location(LocationManager.GPS_PROVIDER);
         mockLoc.setLatitude(lat);
         mockLoc.setLongitude(lng);
         mockLoc.setAccuracy(5f);
@@ -93,7 +100,11 @@ public class MockLocationService extends Service {
             mockLoc.setElapsedRealtimeNanos(android.os.SystemClock.elapsedRealtimeNanos());
         }
 
-        fusedClient.setMockLocation(mockLoc);
+        try {
+            locationManager.setTestProviderLocation(LocationManager.GPS_PROVIDER, mockLoc);
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
     }
 
     private Notification buildNotification(double lat, double lng) {
@@ -129,8 +140,14 @@ public class MockLocationService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (fusedClient != null && mockCallback != null) {
-            fusedClient.removeLocationUpdates(mockCallback);
+        if (locationManager != null && locationListener != null) {
+            try {
+                locationManager.removeUpdates(locationListener);
+                locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, false);
+                locationManager.removeTestProvider(LocationManager.GPS_PROVIDER);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 

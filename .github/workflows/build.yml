@@ -28,60 +28,52 @@ jobs:
         key: android-sdk-34
         restore-keys: android-sdk-34
 
-    - name: Install Android SDK (with retry and mirror)
+    - name: Install Android SDK
       shell: bash
       run: |
         ANDROID_HOME=$HOME/Android/Sdk
         mkdir -p $ANDROID_HOME/cmdline-tools
         cd $ANDROID_HOME/cmdline-tools
-        
-        # Only download if not cached
+
         if [ ! -d "$ANDROID_HOME/platforms/android-34" ]; then
           echo "Downloading cmdline-tools..."
           for url in \
-            "https://repo.huaweicloud.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
-            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"; do
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            "https://repo.huaweicloud.com/android/repository/commandlinetools-linux-11076708_latest.zip"; do
             echo "Trying $url"
-            curl -fsSL --retry 3 --retry-delay 5 "$url" -o cmdline-tools.zip && break || echo "Failed"
+            curl -fsSL --retry 5 --retry-delay 5 --connect-timeout 30 "$url" -o cmdline-tools.zip && break || echo "Failed"
           done
           unzip -q cmdline-tools.zip && rm cmdline-tools.zip
           mv cmdline-tools latest
-          
+
           export ANDROID_HOME=$ANDROID_HOME
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          
+
           echo "Accepting licenses..."
           yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses > /dev/null
-          
+
           echo "Installing packages..."
           yes | sdkmanager --sdk_root=$ANDROID_HOME --no_https "platform-tools" "platforms;android-34" "build-tools;34.0.0"
         else
-          echo "SDK already cached, skipping download"
+          echo "SDK already cached"
         fi
 
     - name: Fix build config
       shell: bash
-      env:
-        ANDROID_HOME: ${{ env.ANDROID_HOME }}
       run: |
+        # Overwrite settings.gradle - no Google Maven needed anymore
         cat > settings.gradle << 'EOF'
-        pluginManagement {
-            repositories {
-                maven { url 'https://repo.huaweicloud.com/repository/maven/google' }
-                mavenCentral()
-                gradlePluginPortal()
-            }
-        }
         dependencyResolutionManagement {
-            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
-                maven { url 'https://repo.huaweicloud.com/repository/maven/google' }
                 mavenCentral()
             }
         }
         rootProject.name = "GeoShift"
         include ':app'
         EOF
+
+        # Point local.properties to SDK
         echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
     - name: Grant execute permission for gradlew
