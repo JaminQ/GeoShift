@@ -19,34 +19,24 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Install Android SDK
-      shell: bash
-      run: |
-        ANDROID_HOME=$HOME/Android/Sdk
-        mkdir -p $ANDROID_HOME/cmdline-tools
-        cd $ANDROID_HOME/cmdline-tools
-        curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip
-        unzip -q cmdline-tools.zip && rm cmdline-tools.zip
-        mv cmdline-tools latest
-        export ANDROID_HOME=$ANDROID_HOME
-        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-        yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses > /dev/null
-        yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 34
+        build-tools: '34.0.0'
+        ndk: '25.1.8937393'
+        cmake: '3.22.1'
 
-    - name: Inject google() repository into app build.gradle
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./gradlew
+
+    - name: Inject google Maven repo into settings
       shell: bash
       run: |
-        sed -i "/dependencies {/i\\    repositories {\n        google()\n        mavenCentral()\n    }\n" app/build.gradle
+        sed -i 's/mavenCentral()/maven { url '"'"'https:\/\/maven.google.com'"'"' }\n        mavenCentral()/' settings.gradle
 
     - name: Build Debug APK
-      shell: bash
-      env:
-        ANDROID_HOME: ${{ env.ANDROID_HOME }}
-      run: |
-        export ANDROID_HOME=$HOME/Android/Sdk
-        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
-        ./gradlew assembleDebug --no-daemon --stacktrace --info
+      run: ./gradlew assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
