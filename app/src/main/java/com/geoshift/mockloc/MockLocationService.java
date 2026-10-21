@@ -10,11 +10,8 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
-import android.provider.Settings;
 
 import androidx.core.app.NotificationCompat;
-
-import com.geoshift.mockloc.databinding.ActivityMainBinding;
 
 public class MockLocationService extends Service {
     public static boolean isRunning = false;
@@ -36,10 +33,8 @@ public class MockLocationService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            double lat = intent.getDoubleExtra("lat", targetLat);
-            double lng = intent.getDoubleExtra("lng", targetLng);
-            targetLat = lat;
-            targetLng = lng;
+            targetLat = intent.getDoubleExtra("lat", targetLat);
+            targetLng = intent.getDoubleExtra("lng", targetLng);
         }
         startUpdating();
         return START_STICKY;
