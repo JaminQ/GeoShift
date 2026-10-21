@@ -13,10 +13,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
     - name: Setup Android SDK
@@ -24,16 +24,14 @@ jobs:
       with:
         api-level: 34
         build-tools: '34.0.0'
-        ndk: '25.1.8937393'
-        cmake: '3.22.1'
 
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
-    - name: Inject google Maven repo into settings
+    - name: Inject google Maven repo URL
       shell: bash
       run: |
-        sed -i 's/mavenCentral()/maven { url '"'"'https:\/\/maven.google.com'"'"' }\n        mavenCentral()/' settings.gradle
+        sed -i "s/mavenCentral()/maven { url 'https:\/\/maven.google.com' }\n        mavenCentral()/" settings.gradle
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon --stacktrace --info
