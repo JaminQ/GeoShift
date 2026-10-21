@@ -19,31 +19,45 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
 
-    - name: Setup Android SDK (official action)
-      uses: android-actions/setup-android@v3
-      with:
-        api-level: 34
-        ndk: '25.1.8937393'
-        cmake: '3.22.1'
+    - name: Install Android SDK
+      shell: bash
+      run: |
+        echo "=== Downloading cmdline-tools ==="
+        ANDROID_HOME=$HOME/Android/Sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        cd $ANDROID_HOME/cmdline-tools
+        curl -v -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip 2>&1 | tail -5
+        echo "=== Unzipping ==="
+        unzip -q cmdline-tools.zip && rm cmdline-tools.zip
+        mv cmdline-tools latest
+        export ANDROID_HOME=$ANDROID_HOME
+        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+        echo "=== Accepting licenses ==="
+        yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
+        echo "=== Installing packages ==="
+        yes | sdkmanager --sdk_root=$ANDROID_HOME --no_https --verbose "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        echo "=== Installed packages ==="
+        sdkmanager --list --sdk_root=$ANDROID_HOME | head -20
 
     - name: Fix build.gradle - inject explicit Maven repositories
       shell: bash
       run: |
-        # Add repositories to root build.gradle
         sed -i '/^plugins {/a\    repositories {\n        maven { url "https://maven.google.com" }\n        mavenCentral()\n    }' build.gradle
-        # Add repositories to app build.gradle  
         sed -i '/^plugins {/a\    repositories {\n        maven { url "https://maven.google.com" }\n        mavenCentral()\n    }' app/build.gradle
-        # Change FAIL_ON_PROJECT_REPOS to PREFER_SETTINGS
         sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_SETTINGS/' settings.gradle
-        echo "=== build.gradle ===" && cat build.gradle
-        echo "=== app/build.gradle ===" && cat app/build.gradle
         echo "=== settings.gradle ===" && cat settings.gradle
+        echo "=== app/build.gradle ===" && cat app/build.gradle
 
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon --stacktrace --info
+      shell: bash
+      run: |
+        export ANDROID_HOME=$HOME/Android/Sdk
+        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        ./gradlew assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
