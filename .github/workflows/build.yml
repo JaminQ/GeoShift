@@ -22,10 +22,9 @@ jobs:
     - name: Install Android SDK
       shell: bash
       run: |
-        echo "sdk.dir=$HOME/Android/Sdk" > local.properties
         mkdir -p $HOME/Android/Sdk/cmdline-tools
         cd $HOME/Android/Sdk/cmdline-tools
-        curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip
+                curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip
         unzip -q cmdline-tools.zip
         rm cmdline-tools.zip
         mv cmdline-tools latest
@@ -34,11 +33,49 @@ jobs:
         yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
         yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
+    - name: Fix build config
+      shell: bash
+      run: |
+        # 确保根目录 build.gradle 有仓库声明
+        cat > build.gradle << 'EOF'
+        plugins {
+            id 'com.android.application' version
+            '8.2.0' apply false
+        }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        EOF
+        # 确保 settings.gradle 有仓库声明
+
+        cat > settings.gradle << 'EOF'
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.name = "GeoShift"
+        include ':app'
+        EOF
+
     - name: Build Debug APK
       shell: bash
       run: |
         chmod +x ./gradlew
-        ./gradlew assembleDebug --no-daemon --stacktrace
+        ./gradlew assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
