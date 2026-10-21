@@ -22,31 +22,94 @@ jobs:
     - name: Install Android SDK
       shell: bash
       run: |
-        echo "=== Downloading cmdline-tools ==="
         ANDROID_HOME=$HOME/Android/Sdk
         mkdir -p $ANDROID_HOME/cmdline-tools
         cd $ANDROID_HOME/cmdline-tools
-        curl -v -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip 2>&1 | tail -5
-        echo "=== Unzipping ==="
+        curl -fsSL "https://repo.huaweicloud.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o cmdline-tools.zip
         unzip -q cmdline-tools.zip && rm cmdline-tools.zip
         mv cmdline-tools latest
         export ANDROID_HOME=$ANDROID_HOME
         export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-        echo "=== Accepting licenses ==="
         yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
-        echo "=== Installing packages ==="
-        yes | sdkmanager --sdk_root=$ANDROID_HOME --no_https --verbose "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-        echo "=== Installed packages ==="
-        sdkmanager --list --sdk_root=$ANDROID_HOME | head -20
+        yes | sdkmanager --sdk_root=$ANDROID_HOME --no_https "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    - name: Fix build.gradle - inject explicit Maven repositories
+    - name: Rewrite settings.gradle with Huawei mirror
       shell: bash
       run: |
-        sed -i '/^plugins {/a\    repositories {\n        maven { url "https://maven.google.com" }\n        mavenCentral()\n    }' build.gradle
-        sed -i '/^plugins {/a\    repositories {\n        maven { url "https://maven.google.com" }\n        mavenCentral()\n    }' app/build.gradle
-        sed -i 's/FAIL_ON_PROJECT_REPOS/PREFER_SETTINGS/' settings.gradle
-        echo "=== settings.gradle ===" && cat settings.gradle
-        echo "=== app/build.gradle ===" && cat app/build.gradle
+        cat > settings.gradle << 'EOF'
+        pluginManagement {
+            repositories {
+                maven { url 'https://repo.huaweicloud.com/repository/maven/google' }
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+            repositories {
+                maven { url 'https://repo.huaweicloud.com/repository/maven/google' }
+                mavenCentral()
+            }
+        }
+        rootProject.name = "GeoShift"
+        include ':app'
+        EOF
+
+    - name: Rewrite build.gradle with Huawei mirror
+      shell: bash
+      run: |
+        cat > build.gradle << 'EOF'
+        plugins {
+            id 'com.android.application' version '8.2.0' apply false
+        }
+        allprojects {
+            repositories {
+                maven { url 'https://repo.huaweicloud.com/repository/maven/google' }
+                mavenCentral()
+            }
+        }
+        EOF
+        cat > app/build.gradle << 'EOF'
+        plugins {
+            id 'com.android.application'
+        }
+        android {
+            namespace 'com.geoshift.mockloc'
+            compileSdk 34
+            defaultConfig {
+                applicationId "com.geoshift.mockloc"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0.0"
+            }
+            buildTypes {
+                release {
+                    minifyEnabled true
+                    proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                }
+                debug {
+                    minifyEnabled false
+                }
+            }
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+            buildFeatures {
+                viewBinding true
+            }
+        }
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'com.google.android.material:material:1.11.0'
+            implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+            implementation 'com.google.android.gms:play-services-location:21.3.0'
+            implementation 'org.osmdroid:osmdroid-android:6.1.18'
+            implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+        }
+        EOF
+        echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
@@ -56,7 +119,6 @@ jobs:
       run: |
         export ANDROID_HOME=$HOME/Android/Sdk
         export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
         ./gradlew assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
