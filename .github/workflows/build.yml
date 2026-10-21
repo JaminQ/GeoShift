@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
@@ -19,15 +19,55 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        api-level: 34
-        build-tools: '34.0.0'
-        components: |
-          platform-tools
-          platforms;android-34
-          build-tools;34.0.0
+    - name: Install Android SDK
+      shell: bash
+      env:
+        ANDROID_HOME: ${{ env.ANDROID_HOME }}
+      run: |
+        set -e
+        ANDROID_HOME="$HOME/Android/Sdk"
+        mkdir -p "$ANDROID_HOME/cmdline-tools"
+        cd "$ANDROID_HOME/cmdline-tools"
+
+        echo "=== Downloading cmdline-tools ==="
+        # Try multiple mirrors
+        for url in \
+          "https://repo.huaweicloud.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+          "https://mirrors.cloud.tencent.com/AndroidSDK/commandlinetools-linux-11076708_latest.zip" \
+          "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"; do
+          echo "Trying: $url"
+          if curl -fsSL --retry 3 --retry-delay 5 --max-time 60 "$url" -o cmdline-tools.zip; then
+            echo "Downloaded from: $url"
+            break
+          else
+            echo "Failed: $url"
+          fi
+        done
+        
+        if [ ! -f cmdline-tools.zip ]; then
+          echo "ERROR: All download mirrors failed"
+          exit 1
+        fi
+        
+        unzip -q cmdline-tools.zip
+        rm cmdline-tools.zip
+        mv cmdline-tools latest
+
+        export ANDROID_HOME="$ANDROID_HOME"
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+        echo "=== Accepting licenses ==="
+        yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
+
+        echo "=== Installing SDK packages ==="
+        yes | sdkmanager --sdk_root="$ANDROID_HOME" --no_https \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0"
+
+        echo "=== SDK installed successfully ==="
+        ls -la "$ANDROID_HOME/platforms/"
+        ls -la "$ANDROID_HOME/build-tools/"
 
     - name: Fix build config
       shell: bash
@@ -47,7 +87,13 @@ jobs:
       run: chmod +x ./gradlew
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon --stacktrace --info
+      shell: bash
+      env:
+        ANDROID_HOME: ${{ env.ANDROID_HOME }}
+      run: |
+        export ANDROID_HOME="$HOME/Android/Sdk"
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+        ./gradlew assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
