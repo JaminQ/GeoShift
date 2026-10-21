@@ -31,13 +31,14 @@ jobs:
         mv cmdline-tools latest
         export ANDROID_HOME=$HOME/Android/Sdk
         export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+        yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
         yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
     - name: Build Debug APK
       shell: bash
       run: |
-        export ANDROID_HOME=$HOME/Android/Sdk
-        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATHgradle assembleDebug --no-daemon --stacktrace
+        chmod +x ./gradlew
+        ./gradlew assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
