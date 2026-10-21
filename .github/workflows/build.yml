@@ -25,13 +25,32 @@ jobs:
         api-level: 34
         build-tools: '34.0.0'
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x ./gradlew
-
-    - name: Inject google Maven repo URL
+    - name: Fix settings.gradle - ensure google Maven repo
       shell: bash
       run: |
-        sed -i "s/mavenCentral()/maven { url 'https:\/\/maven.google.com' }\n        mavenCentral()/" settings.gradle
+        cat > settings.gradle << 'SETTINGS_EOF'
+        pluginManagement {
+            repositories {
+                maven { url 'https://maven.google.com' }
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+            repositories {
+                maven { url 'https://maven.google.com' }
+                mavenCentral()
+            }
+        }
+        rootProject.name = "GeoShift"
+        include ':app'
+        SETTINGS_EOF
+        echo "=== settings.gradle after fix ==="
+        cat settings.gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./gradlew
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon --stacktrace --info
