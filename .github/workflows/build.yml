@@ -19,20 +19,18 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Enable auto SDK download in gradle.properties
-      shell: bash
-      run: |
-        # Enable AGP to auto-download missing SDK components
-        mkdir -p ~/.gradle
-        cat > ~/.gradle/gradle.properties << 'EOF'
-        android.builder.sdkDownload=true
-        android.sdk.channel=0
-        EOF
-
     - name: Fix build config
       shell: bash
       run: |
+        # settings.gradle: keep google() for pluginManagement, mavenCentral for deps
         cat > settings.gradle << 'EOF'
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
         dependencyResolutionManagement {
             repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
@@ -43,13 +41,13 @@ jobs:
         include ':app'
         EOF
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x ./gradlew
+        # build.gradle: remove Play Services dependency
+        sed -i "/play-services-location/d" app/build.gradle
 
     - name: Build Debug APK
       shell: bash
       run: |
-        ./gradlew assembleDebug --no-daemon --stacktrace --info
+        gradle assembleDebug --no-daemon --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
