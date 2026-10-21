@@ -33,6 +33,11 @@ jobs:
         yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses > /dev/null
         yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
+    - name: Inject google() repository into app build.gradle
+      shell: bash
+      run: |
+        sed -i "/dependencies {/i\\    repositories {\n        google()\n        mavenCentral()\n    }\n" app/build.gradle
+
     - name: Build Debug APK
       shell: bash
       env:
